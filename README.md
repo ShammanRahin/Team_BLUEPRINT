@@ -37,42 +37,42 @@ Vision is computationally heavy, so it runs on the Raspberry Pi. This keeps the 
 ---
 
 ### **Arduino/ESP32 Firmware (`main.ino`)**
-- Reads **two LIDARs** (left/right) → wall-following.  
-- Reads **ultrasonic sensor** (front) → obstacle detection.  
+- Reads **two LIDARs VL53L1X  TOF 400C** (left/right) → wall-following.  
+- Reads **ultrasonic sensor HC SRO4** (front) → obstacle detection.  
 - Reads **TCS34725 color sensor** (via I²C mux) → backup/extra detection.  
-- Receives **vision data** from Pi via serial.  
-- Controls **servo steering** and **motor PWM**.  
+- Receives **vision data - 160 degree FOV CAMERA** from Pi via serial.  
+- Controls **servo steering -HOBBY SERVO ** and **motor PWM - (25 ga)**.  
 
 👉 **Why?**  
 The microcontroller fuses all sensor inputs and ensures **low-latency actuation**.
 
 ---
 
-## 🔑 Control Logic
+## Control Logic
 
 The control system is **layered**:
 
 1. **Wall-following (baseline)**  
    - Error = Right LIDAR – Left LIDAR.  
    - PD control keeps car centered.  
-   - ✅ Works even if vision is unavailable.  
+   - Works even if vision is unavailable.  
 
 2. **Vision-based correction**  
    - If a colored pillar is detected:  
      - **Red → steer left**  
-     - **Yellow → steer right**  
+     - **Green → steer right**  
    - Influence grows with object size (area = closeness).  
-   - ✅ Prevents reacting to false detections far away.  
+   - Prevents reacting to false detections far away.  
 
 3. **Obstacle avoidance**  
    - If sonar < 30 cm → stop, turn sharply.  
    - If sonar < 50 cm → apply extra correction.  
-   - ✅ Protects against sudden obstacles that LIDAR/vision may miss.  
+   - Protects against sudden obstacles that LIDAR/vision may miss.  
 
 4. **Blending strategy**  
    - Final steering = mix of wall PD + vision correction.  
    - Weight depends on pillar area (confidence).  
-   - ✅ Smooth handoff between modes, avoids conflicts.  
+   -  Smooth handoff between modes, avoids conflicts.  
 
 ---
 
@@ -87,7 +87,7 @@ The control system is **layered**:
 
 ## 🚀 Running the System
 
-### Vision Module (Python on Raspberry Pi)
+### Vision Module (Python on Raspberry Pi 4B)
 ```bash
 pip3 install opencv-python numpy flask pyserial picamera2
 python3 tracker.py
