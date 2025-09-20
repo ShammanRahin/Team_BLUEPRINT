@@ -1,26 +1,93 @@
-Engineering materials
-====
+# Self-Driven Vehicle – WRO Future Engineers 2022
 
-This repository contains engineering materials of a self-driven vehicle's model participating in the WRO Future Engineers competition in the season 2022.
+This repository contains engineering materials of a **self-driven vehicle model** built for the **WRO Future Engineers competition** in the 2022 season.  
+The project demonstrates **sensor fusion, vision-based navigation, and autonomous control logic** on a small-scale robotic vehicle.  
 
-## Content
+---
 
-* `t-photos` contains 2 photos of the team (an official one and one funny photo with all team members)
-* `v-photos` contains 6 photos of the vehicle (from every side, from top and bottom)
-* `video` contains the video.md file with the link to a video where driving demonstration exists
-* `schemes` contains one or several schematic diagrams in form of JPEG, PNG or PDF of the electromechanical components illustrating all the elements (electronic components and motors) used in the vehicle and how they connect to each other.
-* `src` contains code of control software for all components which were programmed to participate in the competition
-* `models` is for the files for models used by 3D printers, laser cutting machines and CNC machines to produce the vehicle elements. If there is nothing to add to this location, the directory can be removed.
-* `other` is for other files which can be used to understand how to prepare the vehicle for the competition. It may include documentation how to connect to a SBC/SBM and upload files there, datasets, hardware specifications, communication protocols descriptions etc. If there is nothing to add to this location, the directory can be removed.
+## 📂 Repository Content
 
-## Introduction
+- **t-photos/** → 2 team photos (official + funny).  
+- **v-photos/** → 6 photos of the vehicle (all sides, top, and bottom).  
+- **video/** → `video.md` with link to the driving demo.  
+- **schemes/** → Electrical/mechanical schematics showing sensors, controllers, and wiring.  
+- **src/** → Control software:  
+  - `tracker.py` – Python vision system (Raspberry Pi).  
+  - `main.ino` – Arduino/ESP32 firmware for sensors and actuators.  
+- **models/** → CAD/3D print/CNC files for the vehicle.  
+- **other/** → Extra documentation (protocols, specs, setup notes).  
 
-_This part must be filled by participants with the technical clarifications about the code: which modules the code consists of, how they are related to the electromechanical components of the vehicle, and what is the process to build/compile/upload the code to the vehicle’s controllers._
+---
 
-## How to prepare the repo based on the template
+## 🧑‍💻 Code and Logic Overview
 
-_Remove this section before the first commit to the repository_
+### **Python Vision Module (`tracker.py`)**
+- Captures video via PiCamera/USB camera.  
+- Detects **red and yellow pillars** with HSV color masks.  
+- Computes:
+  - **Color code** (1=red, 0=yellow, 2=none)  
+  - **Error** (horizontal offset from center)  
+  - **Area** (size = confidence).  
+- Sends results over serial (`color error area`).  
+- Provides live MJPEG stream + JSON API via Flask.  
 
-1. Clone this repo by using the `git clone` functionality.
-2. Remove `.git` directory
-3. [Initialize a new public repository on GitHub](https://github.com/new) by following instructions from "create a new repository on the command line" section (appeared after pressing "Create repository" button).
+👉 **Why?**  
+Vision is computationally heavy, so it runs on the Raspberry Pi. This keeps the Arduino free for **real-time control**.
+
+---
+
+### **Arduino/ESP32 Firmware (`main.ino`)**
+- Reads **two LIDARs** (left/right) → wall-following.  
+- Reads **ultrasonic sensor** (front) → obstacle detection.  
+- Reads **TCS34725 color sensor** (via I²C mux) → backup/extra detection.  
+- Receives **vision data** from Pi via serial.  
+- Controls **servo steering** and **motor PWM**.  
+
+👉 **Why?**  
+The microcontroller fuses all sensor inputs and ensures **low-latency actuation**.
+
+---
+
+## 🔑 Control Logic
+
+The control system is **layered**:
+
+1. **Wall-following (baseline)**  
+   - Error = Right LIDAR – Left LIDAR.  
+   - PD control keeps car centered.  
+   - ✅ Works even if vision is unavailable.  
+
+2. **Vision-based correction**  
+   - If a colored pillar is detected:  
+     - **Red → steer left**  
+     - **Yellow → steer right**  
+   - Influence grows with object size (area = closeness).  
+   - ✅ Prevents reacting to false detections far away.  
+
+3. **Obstacle avoidance**  
+   - If sonar < 30 cm → stop, turn sharply.  
+   - If sonar < 50 cm → apply extra correction.  
+   - ✅ Protects against sudden obstacles that LIDAR/vision may miss.  
+
+4. **Blending strategy**  
+   - Final steering = mix of wall PD + vision correction.  
+   - Weight depends on pillar area (confidence).  
+   - ✅ Smooth handoff between modes, avoids conflicts.  
+
+---
+
+## ⚙️ Why This Works
+
+- **Redundancy:** If one sensor fails, others cover.  
+- **Scalability:** Modular code, sensors can be swapped.  
+- **Competition-ready:** Combines stable navigation + color-based decision making.  
+- **Safety:** Sonar ensures last-resort collision prevention.  
+
+---
+
+## 🚀 Running the System
+
+### Vision Module (Python on Raspberry Pi)
+```bash
+pip3 install opencv-python numpy flask pyserial picamera2
+python3 tracker.py
