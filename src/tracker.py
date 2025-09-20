@@ -20,13 +20,18 @@ DRAW_OVERLAY = True
 # HSV ranges
 RED1_LO, RED1_HI = np.array([0,120,80]),   np.array([10,255,255])
 RED2_LO, RED2_HI = np.array([170,120,80]), np.array([180,255,255])
-YEL_LO,  YEL_HI  = np.array([20,120,100]), np.array([35,255,255])
+
+# (changed) GREEN instead of yellow
+GRN_LO,  GRN_HI  = np.array([40,120,80]),  np.array([85,255,255])
+
+# (added) MAGENTA
+MAG_LO,  MAG_HI  = np.array([140,120,80]), np.array([170,255,255])
 
 # Globals
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
 latest_overlay = None
 latest_error = 0
-latest_color = 2   # 1=red, 0=yellow, 2=none
+latest_color = 2   # 1=red, 0=green, 3=magenta, 2=none
 latest_area  = 0
 have_viewer = False
 lock = threading.Lock()
@@ -95,20 +100,25 @@ def process_loop():
 
         red_mask = cv2.inRange(hsv, RED1_LO, RED1_HI)
         red_mask |= cv2.inRange(hsv, RED2_LO, RED2_HI)
-        yel_mask = cv2.inRange(hsv, YEL_LO, YEL_HI)
+        grn_mask = cv2.inRange(hsv, GRN_LO, GRN_HI)          # (changed)
+        mag_mask = cv2.inRange(hsv, MAG_LO, MAG_HI)          # (added)
 
         red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_OPEN, kernel, iterations=1)
-        yel_mask = cv2.morphologyEx(yel_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        grn_mask = cv2.morphologyEx(grn_mask, cv2.MORPH_OPEN, kernel, iterations=1)
+        mag_mask = cv2.morphologyEx(mag_mask, cv2.MORPH_OPEN, kernel, iterations=1)
 
         r_cnt, r_area = find_largest(red_mask)
-        y_cnt, y_area = find_largest(yel_mask)
+        g_cnt, g_area = find_largest(grn_mask)
+        m_cnt, m_area = find_largest(mag_mask)
 
-        if r_area >= y_area and r_cnt is not None:
-            best_cnt, color_code, best_area = r_cnt, 1, r_area  # red
-        elif y_cnt is not None:
-            best_cnt, color_code, best_area = y_cnt, 0, y_area  # yellow
-        else:
-            best_cnt, color_code, best_area = None, 2, 0         # none
+        # choose the color with the largest area among red/green/magenta
+        best_cnt, color_code, best_area = None, 2, 0  # default none
+        if r_cnt is not None or g_cnt is not None or m_cnt is not None:
+            candidates = []
+            if r_cnt is not None: candidates.append((r_cnt, r_area, 1))  # red
+            if g_cnt is not None: candidates.append((g_cnt, g_area, 0))  # green
+            if m_cnt is not None: candidates.append((m_cnt, m_area, 3))  # magenta
+            best_cnt, best_area, color_code = max(candidates, key=lambda t: t[1])
 
         error = 0
         overlay = frame_bgr
@@ -162,7 +172,7 @@ def gen_mjpeg():
         have_viewer = False
 
 # Flask
-app = Flask(_name_)
+app = Flask(name)
 
 @app.route("/")
 def index():
@@ -172,7 +182,7 @@ def index():
 def status():
     with lock:
         return jsonify({
-            "color": latest_color,   # 1=red, 0=yellow, 2=none
+            "color": latest_color,   # 1=red, 0=green, 3=magenta, 2=none
             "error": latest_error,
             "area":  latest_area
         })
@@ -183,7 +193,7 @@ def stream():
                     mimetype="multipart/x-mixed-replace; boundary=frame")
 
 # Main
-if _name_ == "_main_":
+if name == "main":
     t = threading.Thread(target=process_loop, daemon=True)
     t.start()
     app.run(host="0.0.0.0", port=5000, threaded=True)
