@@ -1,6 +1,6 @@
-# Self-Driven Vehicle – WRO Future Engineers 2022
+ WRO Future Engineers 2025
 
-This repository contains engineering materials of a **self-driven vehicle model** built for the **WRO Future Engineers competition** in the 2022 season.  
+This repository contains engineering materials of a **self-driven vehicle model** built for the **WRO Future Engineers competition** in the 2025 season.  
 The project demonstrates **sensor fusion, vision-based navigation, and autonomous control logic** on a small-scale robotic vehicle.  
 
 ---
